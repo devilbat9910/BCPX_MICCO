@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      #successMessage {
+        display: none;    /* ban đầu ẩn */
+        color: green;
+        font-weight: bold;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h3>Tạo báo cáo mới</h3>
+
+    <!-- Nhập Tháng/Năm -->
+    <label>Tháng/Năm báo cáo:</label>
+    <input type="month" id="monthYear"><br><br>
+
+    <!-- Danh mục sản phẩm -->
+    <label>Danh mục sản phẩm:</label>
+    <div>
+      <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)">
+      <label for="selectAll" style="font-weight: bold;">Chọn tất cả</label>
+    </div>
+    <div id="productList" style="border: 1px solid #ccc; padding: 10px; max-height: 200px; overflow-y: scroll;">
+      <!-- Danh sách sản phẩm sẽ được tạo động -->
+    </div><br>
+
+    <button onclick="applyFilter()">Tạo báo cáo</button>
+
+    <p id="successMessage">Báo cáo đã được tạo thành công!</p>
+
+    <script>
+      // Lấy danh sách sản phẩm từ Apps Script
+      function populateProducts() {
+        google.script.run
+          .withSuccessHandler(renderProducts)
+          .getProductList();
+      }
+
+      // Hiển thị danh sách sản phẩm dưới dạng checkbox
+      function renderProducts(products) {
+        const container = document.getElementById('productList');
+        container.innerHTML = ""; // Xóa nội dung trước đó
+
+        if (!products || products.length === 0) {
+          container.innerHTML = "<p>Không có sản phẩm nào để hiển thị.</p>";
+          return;
+        }
+
+        products.forEach(product => {
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.value = product;
+          checkbox.name = 'product';
+          checkbox.classList.add('productCheckbox'); // Thêm lớp để quản lý các checkbox
+          container.appendChild(checkbox);
+
+          const label = document.createElement('label');
+          label.textContent = product;
+          label.style.marginLeft = '5px';
+          container.appendChild(label);
+
+          container.appendChild(document.createElement('br'));
+        });
+      }
+
+      // Chọn hoặc bỏ chọn tất cả sản phẩm
+      function toggleSelectAll(selectAllCheckbox) {
+        const productCheckboxes = document.querySelectorAll('.productCheckbox');
+        productCheckboxes.forEach(checkbox => {
+          checkbox.checked = selectAllCheckbox.checked;
+        });
+      }
+
+      // Gửi dữ liệu lọc về Apps Script và hiển thị thông báo thành công
+      function applyFilter() {
+        const monthYear = document.getElementById('monthYear').value;
+        const selectedProducts = Array.from(
+          document.querySelectorAll('input[name="product"]:checked')
+        ).map(checkbox => checkbox.value);
+
+        if (!monthYear) {
+          alert('Vui lòng nhập Tháng/Năm báo cáo.');
+          return;
+        }
+
+        if (selectedProducts.length === 0) {
+          alert('Vui lòng chọn ít nhất một sản phẩm.');
+          return;
+        }
+
+        // Tham chiếu đến phần tử hiển thị thông báo
+        const successMessage = document.getElementById('successMessage');
+        
+        // 1) Hiển thị thông báo đang xử lý
+        successMessage.textContent = 'Đang tạo bảng... xin chờ !';
+        successMessage.style.color = 'blue';
+        successMessage.style.display = 'block';
+
+        // 2) Gọi Apps Script để xử lý
+        google.script.run
+          .withSuccessHandler(() => {
+            // 3) Khi thành công => đổi nội dung thông báo
+            successMessage.textContent = 'Báo cáo đã được tạo thành công!';
+            successMessage.style.color = 'green';
+          })
+          .generateAndCopySheet({
+            monthYear,
+            selectedProducts
+          });
+      }
+
+      // Gọi populateProducts khi tải giao diện
+      document.addEventListener('DOMContentLoaded', populateProducts);
+    </script>
+  </body>
+</html>
