@@ -29,17 +29,6 @@
         border: 1px solid #ddd;
         border-radius: 4px;
       }
-      .checkbox-list {
-        max-height: 200px;
-        overflow-y: auto;
-        border: 1px solid #ddd;
-        padding: 10px;
-        margin: 5px 0;
-        border-radius: 4px;
-      }
-      .workshop-item {
-        margin-bottom: 8px;
-      }
       .button-group {
         display: flex;
         justify-content: space-between;
@@ -65,19 +54,6 @@
       .btn:hover {
         background-color: #2a75f3;
       }
-      .checkbox-container {
-        display: flex;
-        align-items: center;
-        margin: 5px 0;
-      }
-      .checkbox-container input[type="checkbox"] {
-        width: auto;
-        margin-right: 8px;
-      }
-      .checkbox-container label {
-        display: inline;
-        font-weight: normal;
-      }
       .progress-container {
         margin-top: 20px;
         display: none;
@@ -100,26 +76,11 @@
         margin-top: 10px;
         font-weight: bold;
       }
-      .hidden {
-        display: none;
-      }
-      .action-buttons {
-        margin: 10px 0;
-      }
-      .action-buttons button {
-        background-color: #f1f1f1;
-        color: #333;
-        border: 1px solid #ddd;
-        padding: 5px 10px;
-        margin-right: 5px;
-        cursor: pointer;
-        border-radius: 4px;
-      }
     </style>
   </head>
   <body>
     <div class="header">
-      TỔNG HỢP BÁO CÁO TỪ CÁC PHÂN XƯỞNG
+      TỔNG HỢP BÁO CÁO CUỐI THÁNG
     </div>
     
     <form id="reportForm">
@@ -128,17 +89,6 @@
         <select id="monthSelect">
           <option value="">-- Chọn tháng/năm --</option>
         </select>
-      </div>
-      
-      <div class="form-group">
-        <label>Chọn phân xưởng:</label>
-        <div class="action-buttons">
-          <button type="button" onclick="selectAll(true)">Chọn tất cả</button>
-          <button type="button" onclick="selectAll(false)">Bỏ chọn tất cả</button>
-        </div>
-        <div id="workshopList" class="checkbox-list">
-          <div class="loading">Đang tải danh sách phân xưởng...</div>
-        </div>
       </div>
       
       <button type="button" class="btn" id="consolidateBtn">Tổng hợp báo cáo</button>
@@ -152,10 +102,6 @@
     </div>
     
     <script>
-      // Biến toàn cục
-      let availableMonths = [];
-      let workshopsWithReport = [];
-      
       // Khi trang được tải
       document.addEventListener('DOMContentLoaded', function() {
         // Lấy danh sách tháng có sẵn
@@ -165,15 +111,11 @@
           .getAvailableMonths();
         
         // Gán sự kiện cho nút tổng hợp
-        document.getElementById('consolidateBtn').addEventListener('click', consolidateReports);
-        
-        // Gán sự kiện cho combobox tháng
-        document.getElementById('monthSelect').addEventListener('change', onMonthSelected);
+        document.getElementById('consolidateBtn').addEventListener('click', consolidateReport);
       });
       
       // Xử lý sau khi tải danh sách tháng
       function onMonthsLoaded(months) {
-        availableMonths = months;
         const select = document.getElementById('monthSelect');
         
         // Thêm các tháng vào dropdown
@@ -187,82 +129,11 @@
         // Chọn tháng mới nhất
         if (months.length > 0) {
           select.value = months[months.length - 1];
-          onMonthSelected();
         }
-      }
-      
-      // Xử lý khi chọn tháng
-      function onMonthSelected() {
-        const monthSelect = document.getElementById('monthSelect');
-        const selectedMonth = monthSelect.value;
-        
-        if (selectedMonth) {
-          // Hiển thị thông báo đang tải
-          document.getElementById('workshopList').innerHTML = '<div class="loading">Đang tải danh sách phân xưởng...</div>';
-          
-          // Lấy danh sách phân xưởng có báo cáo cho tháng đã chọn
-          google.script.run
-            .withSuccessHandler(onWorkshopsLoaded)
-            .withFailureHandler(onError)
-            .getWorkshopsWithReport(selectedMonth);
-        } else {
-          document.getElementById('workshopList').innerHTML = '<div>Vui lòng chọn tháng/năm báo cáo</div>';
-        }
-      }
-      
-      // Xử lý sau khi tải danh sách phân xưởng
-      function onWorkshopsLoaded(workshops) {
-        workshopsWithReport = workshops;
-        renderWorkshopList();
-      }
-      
-      // Hiển thị danh sách phân xưởng
-      function renderWorkshopList() {
-        const container = document.getElementById('workshopList');
-        container.innerHTML = '';
-        
-        if (!workshopsWithReport || workshopsWithReport.length === 0) {
-          container.innerHTML = '<div>Không có phân xưởng nào có báo cáo cho tháng đã chọn</div>';
-          return;
-        }
-        
-        // Hiển thị danh sách phân xưởng
-        workshopsWithReport.forEach(function(workshop) {
-          const workshopItem = document.createElement('div');
-          workshopItem.className = 'workshop-item';
-          
-          const checkboxContainer = document.createElement('div');
-          checkboxContainer.className = 'checkbox-container';
-          
-          const checkbox = document.createElement('input');
-          checkbox.type = 'checkbox';
-          checkbox.id = 'workshop_' + workshop.code;
-          checkbox.value = workshop.code;
-          checkbox.name = 'workshops';
-          checkbox.checked = true; // Mặc định chọn tất cả
-          
-          const label = document.createElement('label');
-          label.htmlFor = 'workshop_' + workshop.code;
-          label.textContent = workshop.name + ' (' + workshop.code + ')';
-          
-          checkboxContainer.appendChild(checkbox);
-          checkboxContainer.appendChild(label);
-          workshopItem.appendChild(checkboxContainer);
-          
-          container.appendChild(workshopItem);
-        });
-      }
-      
-      // Chọn/bỏ chọn tất cả phân xưởng
-      function selectAll(select) {
-        const checkboxes = document.querySelectorAll('input[name="workshops"]');
-        checkboxes.forEach(function(checkbox) {
-          checkbox.checked = select;
-        });
       }
       
       // Tổng hợp báo cáo
-      function consolidateReports() {
+      function consolidateReport() {
         // Hiển thị thanh tiến trình
         document.getElementById('progressContainer').style.display = 'block';
         document.getElementById('statusMessage').textContent = 'Đang tổng hợp báo cáo...';
@@ -274,18 +145,6 @@
         
         if (!selectedMonth) {
           showError('Vui lòng chọn tháng/năm báo cáo');
-          return;
-        }
-        
-        // Lấy danh sách phân xưởng đã chọn
-        const selectedWorkshops = Array.from(
-          document.querySelectorAll('input[name="workshops"]:checked')
-        ).map(function(checkbox) {
-          return checkbox.value;
-        });
-        
-        if (selectedWorkshops.length === 0) {
-          showError('Vui lòng chọn ít nhất một phân xưởng');
           return;
         }
         
@@ -325,9 +184,8 @@
             document.getElementById('monthSelect').disabled = false;
             document.getElementById('consolidateBtn').disabled = false;
           })
-          .consolidateReports({
-            monthYear: selectedMonth,
-            selectedWorkshops: selectedWorkshops
+          .consolidateReport({
+            monthYear: selectedMonth
           });
         
         // Cập nhật tiến trình

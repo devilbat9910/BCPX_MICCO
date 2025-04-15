@@ -1,0 +1,54 @@
+Quy trình hoạt động và tác dụng của các chức năng
+Sau khi phân tích mã nguồn dự án, tôi sẽ giải thích quy trình hoạt động và tác dụng của từng nút chức năng trong menu "Tự Động Báo Cáo".
+Tổng quan hệ thống
+Đây là một hệ thống tự động hóa quy trình báo cáo sản xuất của các phân xưởng trong doanh nghiệp (có vẻ như là MICCO). Hệ thống được phát triển bằng Google Apps Script và hoạt động trên Google Sheets, hỗ trợ việc tạo, thu gọn, tổng hợp và gửi báo cáo sản xuất giữa các phân xưởng và phòng Kỹ thuật Công nghệ (KTCN).
+Các chức năng trong menu "Tự Động Báo Cáo"
+Khi người dùng mở tệp Google Sheets, hàm onOpen() sẽ tạo một menu tùy chỉnh với các chức năng sau:
+1. Tạo báo cáo
+Quy trình hoạt động:
+•	Khi nhấn nút này, hệ thống sẽ hiển thị hộp thoại "Tạo báo cáo mới" (FilterDialog.html) cho phép người dùng: 
+o	Chọn tháng/năm báo cáo
+o	Chọn các sản phẩm từ danh mục sản phẩm
+•	Danh sách sản phẩm được lấy từ sheet "Danh mục sản phẩm" thông qua hàm getProductList()
+•	Khi người dùng nhấn "Tạo báo cáo", hệ thống sẽ: 
+o	Tạo một sheet báo cáo mới có tên "Báo cáo MM/YYYY" bằng cách sao chép từ template "Báo cáo tổng hợp"
+o	Thay thế các chuỗi "mm/yyyy" trong tiêu đề báo cáo bằng tháng/năm đã chọn
+o	Lọc dữ liệu chỉ giữ lại các mục thuộc sản phẩm đã chọn
+o	Đồng thời tạo một sheet theo dõi sản lượng có tên "MM/YYYY" bằng cách sao chép từ template "Theo dõi sản lượng trong tháng"
+2. Thu gọn báo cáo
+Quy trình hoạt động:
+•	Khi nhấn nút này, hệ thống sẽ hiển thị hộp thoại cho phép người dùng chọn báo cáo cần thu gọn (mặc định là báo cáo mới nhất)
+•	Sau khi xác nhận, hệ thống sẽ thực hiện thu gọn báo cáo thông qua hàm shrinkReport() theo logic: 
+o	Lượt 1: Kiểm tra từng nhóm báo cáo (cấp 1), tìm các dòng con có cột B = "Sản lượng" và kiểm tra dữ liệu. Nếu không có dữ liệu hợp lệ, ẩn cả nhóm.
+o	Lượt 2: Duyệt từ tầng sâu nhất lên tầng cao, ẩn các dòng không có con trực tiếp "hiện" và không có giá trị hợp lệ ở cột G.
+o	Đảm bảo nếu một dòng con đang hiển thị thì tất cả các dòng tổ tiên đều phải hiển thị.
+Mục đích: Làm gọn báo cáo bằng cách ẩn các dòng không có dữ liệu hoặc không cần thiết, giúp báo cáo dễ đọc hơn.
+3. Gửi báo cáo
+Quy trình hoạt động:
+•	Khi nhấn nút này, hệ thống sẽ hiển thị hộp thoại cho phép người dùng chọn báo cáo cần gửi (mặc định là báo cáo mới nhất)
+•	Hệ thống kiểm tra tên báo cáo phải đúng định dạng "Báo cáo MM/YYYY"
+•	Sau khi xác nhận, hệ thống sẽ: 
+o	Sao chép worksheet báo cáo được chọn sang một Google Sheet đích (có ID cố định - của phòng KTCN)
+o	Đổi tên worksheet đã sao chép thành "PXĐT_{tên gốc}" (thêm tiền tố PXĐT - có thể là "Phân xưởng Đông Triều")
+o	Hiển thị thông báo xác nhận đã gửi báo cáo thành công
+4. Báo cáo cuối tháng
+Quy trình hoạt động:
+•	Khi nhấn nút này, hệ thống sẽ hiển thị hộp thoại "Tổng hợp báo cáo từ các phân xưởng" (ConsolidateReportDialog.html)
+•	Hộp thoại cho phép người dùng: 
+o	Chọn tháng/năm cần tổng hợp báo cáo
+o	Chọn các phân xưởng cần lấy dữ liệu (CP, ĐN, TB, QN, NB, VT, ĐT)
+•	Khi người dùng nhấn "Tổng hợp báo cáo", hệ thống sẽ: 
+o	Tạo một sheet báo cáo tổng hợp mới có tên "Báo cáo MM/YYYY" bằng cách sao chép từ template "BC_TCT"
+o	Kết nối và lấy dữ liệu từ các file Google Sheets của các phân xưởng đã chọn
+o	Tổng hợp dữ liệu vào báo cáo, duy trì cấu trúc chỉ mục
+o	Ẩn các hàng không có dữ liệu
+o	Sao chép giá trị từ cột L sang cột E và G cho các dòng có chỉ mục cấp 2 là "1"
+Luồng làm việc tổng thể
+1.	Đầu tháng: Người dùng tạo báo cáo mới cho tháng hiện tại bằng chức năng "Tạo báo cáo" với danh sách sản phẩm cần theo dõi.
+2.	Trong tháng: Dữ liệu sản xuất được cập nhật vào sheet "MM/YYYY" (sheet theo dõi sản lượng trong tháng).
+3.	Cuối tháng: 
+o	Người dùng có thể thu gọn báo cáo để dễ đọc bằng chức năng "Thu gọn báo cáo".
+o	Gửi báo cáo đến phòng KTCN bằng chức năng "Gửi báo cáo".
+4.	Tại phòng KTCN: Tổng hợp báo cáo từ tất cả các phân xưởng bằng chức năng "Báo cáo cuối tháng".
+Hệ thống này giúp tự động hóa quy trình báo cáo sản xuất, giảm thiểu công việc thủ công và đảm bảo tính nhất quán giữa các phân xưởng.
+
