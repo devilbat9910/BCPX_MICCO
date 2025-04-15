@@ -1,4 +1,151 @@
 /**
+ * Ẩn các hàng không có dữ liệu trong báo cáo
+ * @param {Sheet} reportSheet - Sheet báo cáo
+ */
+function hideEmptyRows(reportSheet) {
+  // Lấy dữ liệu từ báo cáo
+  const data = reportSheet.getDataRange().getValues();
+  const headers = 10; // Bắt đầu từ hàng 11 (index 10)
+  
+  // Xác định các chỉ mục và mối quan hệ cha-con
+  let rowsInfo = [];
+  let parentChildMap = {}; // Map để lưu trữ mối quan hệ cha-con
+  let rowsToHide = [];     // Danh sách các hàng cần ẩn
+  
+  // 1. Thu thập thông tin về các hàng và xây dựng quan hệ cha-con
+  for (let i = headers; i < data.length; i++) {
+    const rowNum = i + 1; // 1-based
+    const index = data[i][0]; // Cột A - chỉ mục
+    
+    if (index && typeof index === 'string') {
+      const indexStr = index.toString().trim();
+      const level = indexStr.split('.').length;
+      const hasData = isNonEmpty(data[i][4]) || isNonEmpty(data[i][6]); // Kiểm tra cột E và G
+      
+      // Thêm thông tin hàng
+      rowsInfo.push({
+        rowNum: rowNum,
+        indexStr: indexStr,
+        level: level,
+        hasData: hasData
+      });
+      
+      // Xác định quan hệ cha-con
+      if (level > 1) {
+        // Tìm chỉ mục của nút cha
+        const parts = indexStr.split('.');
+        parts.pop(); // Loại bỏ phần tử cuối
+        const parentIndex = parts.join('.');
+        
+        // Thêm vào map cha-con
+        if (!parentChildMap[parentIndex]) {
+          parentChildMap[parentIndex] = [];
+        }
+        parentChildMap[parentIndex].push(indexStr);
+      }
+    }
+  }
+  
+  // 2. Tìm các hàng cần ẩn
+  // Sắp xếp rowsInfo theo level giảm dần (xử lý từ con lên cha)
+  rowsInfo.sort((a, b) => b.level - a.level);
+  
+  // Map để theo dõi các hàng hiện/ẩn
+  let visibility = {}; // key: indexStr, value: true (hiện) hoặc false (ẩn)
+  
+  // Khởi tạo trạng thái hiển thị ban đầu dựa trên dữ liệu
+  rowsInfo.forEach(row => {
+    visibility[row.indexStr] = row.hasData;
+  });
+  
+  // Duyệt từ cấp thấp lên để cập nhật trạng thái hiển thị
+  rowsInfo.forEach(row => {
+    // Nếu đây là nút cha và không có dữ liệu
+    if (!row.hasData) {
+      // Kiểm tra xem có con nào hiển thị không
+      const children = parentChildMap[row.indexStr] || [];
+      const anyChildVisible = children.some(childIndex => visibility[childIndex]);
+      
+      // Nếu không có con nào hiển thị, ẩn nút cha
+      if (!anyChildVisible) {
+        visibility[row.indexStr] = false;
+      } else {
+        visibility[row.indexStr] = true; // Nếu có con hiển thị, hiển thị nút cha
+      }
+    }
+  });
+  
+  // 3. Cập nhật lần cuối: Nếu một nút hiển thị, đảm bảo tất cả tổ tiên đều hiển thị
+  rowsInfo.forEach(row => {
+    if (visibility[row.indexStr]) {
+      // Với mỗi nút hiển thị, đảm bảo tất cả tổ tiên hiển thị
+      let parts = row.indexStr.split('.');
+      while (parts.length > 1) {
+        parts.pop();
+        const ancestorIndex = parts.join('.');
+        visibility[ancestorIndex] = true;
+      }
+    }
+  });
+  
+  // 4. Thu thập danh sách các hàng cần ẩn
+  rowsInfo.forEach(row => {
+    if (!visibility[row.indexStr]) {
+      rowsToHide.push(row.rowNum);
+    }
+  });
+  
+  // 5. Thực hiện ẩn các hàng (gom nhóm các hàng liên tiếp)
+  if (rowsToHide.length > 0) {
+    // Sắp xếp theo thứ tự tăng dần
+    rowsToHide.sort((a, b) => a - b);
+    
+    // Gom nhóm các hàng liên tiếp
+    let startRow = rowsToHide[0];
+    let count = 1;
+    
+    for (let i = 1; i < rowsToHide.length; i++) {
+      if (rowsToHide[i] === rowsToHide[i-1] + 1) {
+        // Hàng liên tiếp
+        count++;
+      } else {
+        // Ẩn nhóm hiện tại
+        reportSheet.hideRows(startRow, count);
+        
+        // Bắt đầu nhóm mới
+        startRow = rowsToHide[i];
+        count = 1;
+      }
+    }
+    
+    // Ẩn nhóm cuối cùng
+    if (count > 0) {
+      reportSheet.hideRows(startRow, count);
+    }
+  }
+  
+  Logger.log(`Đã ẩn ${rowsToHide.length} hàng không có dữ liệu.`);
+}
+
+/**
+ * Kiểm tra xem một giá trị có trống không
+ * @param {*} value - Giá trị cần kiểm tra
+ * @return {boolean} - true nếu không trống, false nếu trống
+ */
+function isNonEmpty(value) {
+  if (value === null || value === undefined || value === "") return false;
+  if (typeof value === "number" && value === 0) return false;
+  if (typeof value === "string") {
+    const lower = value.toLowerCase();
+    // Kiểm tra các giá trị lỗi thường gặp
+    if (lower.indexOf("div/0") !== -1 || lower.indexOf("ref!") !== -1 || lower.indexOf("#n/a") !== -1) {
+      return false;
+    }
+    // Kiểm tra xem chuỗi có chỉ chứa khoảng trắng không
+    if (value.trim() === "") return false;
+  }
+  return true;
+}/**
  * Module tổng hợp báo cáo cuối tháng
  */
 
@@ -77,6 +224,9 @@ function consolidateReport(data) {
     
     // Sao chép dữ liệu từ cột C của sheet INPUT sang cột E và G của sheet báo cáo
     copyValuesFromInputSheet(inputSheet, reportSheet);
+    
+    // Ẩn các hàng không có dữ liệu
+    hideEmptyRows(reportSheet);
     
     // Hiển thị sheet báo cáo (đảm bảo không bị ẩn)
     reportSheet.activate();
